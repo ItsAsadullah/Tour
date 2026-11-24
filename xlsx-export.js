@@ -1,10 +1,12 @@
 /**
- * Pure Offline Native OOXML (.xlsx) Generator
- * Exports the exact Arkan Group Tour Expenses workbook with:
+ * Pure Offline Native OOXML (.xlsx) Generator — Microsoft Excel 2007/2010–365 Compatible
+ * Generates native Excel XML using:
+ * - xl/sharedStrings.xml (t="s" shared strings table — 100% native Excel 2010 format)
+ * - Complete sheetViews, sheetFormatPr, dimension, bookViews, calcPr, cellStyles, dxfs, tableStyles
  * - Merged headers & per-day vertical merges (Cols I-P)
  * - Live Excel formulas (=H4-F4+1, =SUM(...)) + cached values
  * - Exact Calibri styling, thin black borders, date formats, landscape A4 setup
- * - Embedded Prepared by signature PNG image
+ * - Embedded Prepared by signature PNG image with full DrawingML xfrm
  */
 (function () {
   'use strict';
@@ -46,8 +48,8 @@
       const localHeader = new Uint8Array(30 + nameBytes.length);
       const lv = new DataView(localHeader.buffer);
       lv.setUint32(0, 0x04034b50, true); // signature
-      lv.setUint16(4, 20, true);         // version needed
-      lv.setUint16(6, 0x0800, true);     // UTF-8 flag
+      lv.setUint16(4, 20, true);         // version needed (2.0)
+      lv.setUint16(6, 0, true);          // flags: 0 (standard ASCII filenames, Excel 2010 friendly)
       lv.setUint16(8, 0, true);          // method: 0 (store)
       lv.setUint16(10, 0, true);         // mod time
       lv.setUint16(12, 0x5421, true);    // mod date
@@ -66,7 +68,7 @@
       cv.setUint32(0, 0x02014b50, true); // signature
       cv.setUint16(4, 20, true);         // version made by
       cv.setUint16(6, 20, true);         // version needed
-      cv.setUint16(8, 0x0800, true);     // UTF-8 flag
+      cv.setUint16(8, 0, true);          // flags: 0
       cv.setUint16(10, 0, true);         // method: store
       cv.setUint16(12, 0, true);
       cv.setUint16(14, 0x5421, true);
@@ -112,7 +114,9 @@
 
   // ---- Helpers ----
   function escXml(val) {
+    // Strip illegal XML 1.0 control characters too
     return String(val ?? '')
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
@@ -128,26 +132,22 @@
   }
 
   function numVal(v) {
+    if (v === '' || v === null || v === undefined) return 0;
     const n = Number(v);
-    return Number.isFinite(n) && v !== '' && v !== null && v !== undefined ? n : 0;
-  }
-
-  function strCell(ref, text, style) {
-    if (text === '' || text === null || text === undefined) {
-      return `<c r="${ref}" s="${style}"/>`;
-    }
-    return `<c r="${ref}" t="inlineStr" s="${style}"><is><t xml:space="preserve">${escXml(text)}</t></is></c>`;
+    return Number.isFinite(n) ? n : 0;
   }
 
   function numCell(ref, val, style, showZero) {
-    if ((val === '' || val === null || val === undefined || Number(val) === 0) && !showZero) {
+    const n = numVal(val);
+    if ((!n || val === '' || val === null || val === undefined) && !showZero) {
       return `<c r="${ref}" s="${style}"/>`;
     }
-    return `<c r="${ref}" s="${style}"><v>${Number(val)}</v></c>`;
+    return `<c r="${ref}" s="${style}"><v>${n}</v></c>`;
   }
 
   function formulaCell(ref, formula, cachedVal, style) {
-    return `<c r="${ref}" s="${style}"><f>${escXml(formula)}</f><v>${cachedVal}</v></c>`;
+    const v = Number.isFinite(Number(cachedVal)) ? Number(cachedVal) : 0;
+    return `<c r="${ref}" s="${style}"><f>${escXml(formula)}</f><v>${v}</v></c>`;
   }
 
   // Render signature (+ optional signature date) into a crisp transparent PNG Uint8Array
@@ -166,7 +166,6 @@
           const ctx = canvas.getContext('2d');
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-          // Draw signature aspect-fitted into sigW x sigH
           const ratio = Math.min(sigW / img.width, sigH / img.height);
           const drawW = img.width * ratio;
           const drawH = img.height * ratio;
@@ -174,7 +173,6 @@
           const dy = sigH - drawH;
           ctx.drawImage(img, dx, dy, drawW, drawH);
 
-          // If blendWhite is enabled, convert near-white pixels to transparent
           if (blendWhite) {
             const imgData = ctx.getImageData(0, 0, sigW, sigH);
             const d = imgData.data;
@@ -212,52 +210,55 @@
   }
 
   function buildStylesXml() {
-    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <numFmts count="2">
-    <numFmt numFmtId="164" formatCode="d\\-m\\-yyyy"/>
-    <numFmt numFmtId="165" formatCode="d/m/yyyy"/>
-  </numFmts>
-  <fonts count="5">
-    <font><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font>
-    <font><b/><sz val="14"/><color rgb="FF000000"/><name val="Calibri"/></font>
-    <font><b/><sz val="12"/><color rgb="FF000000"/><name val="Calibri"/></font>
-    <font><sz val="12"/><color rgb="FF000000"/><name val="Calibri"/></font>
-    <font><b/><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font>
-  </fonts>
-  <fills count="2">
-    <fill><patternFill patternType="none"/></fill>
-    <fill><patternFill patternType="gray125"/></fill>
-  </fills>
-  <borders count="2">
-    <border><left/><right/><top/><bottom/><diagonal/></border>
-    <border>
-      <left style="thin"><color rgb="FF000000"/></left>
-      <right style="thin"><color rgb="FF000000"/></right>
-      <top style="thin"><color rgb="FF000000"/></top>
-      <bottom style="thin"><color rgb="FF000000"/></bottom>
-      <diagonal/>
-    </border>
-  </borders>
-  <cellStyleXfs count="1">
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
-  </cellStyleXfs>
-  <cellXfs count="13">
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
-    <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="164" fontId="3" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
-    <xf numFmtId="164" fontId="3" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
-    <xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-  </cellXfs>
-</styleSheet>`;
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<numFmts count="2">' +
+        '<numFmt numFmtId="164" formatCode="d\\-m\\-yyyy"/>' +
+        '<numFmt numFmtId="165" formatCode="d/m/yyyy"/>' +
+      '</numFmts>' +
+      '<fonts count="5">' +
+        '<font><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font>' +
+        '<font><b/><sz val="14"/><color rgb="FF000000"/><name val="Calibri"/></font>' +
+        '<font><b/><sz val="12"/><color rgb="FF000000"/><name val="Calibri"/></font>' +
+        '<font><sz val="12"/><color rgb="FF000000"/><name val="Calibri"/></font>' +
+        '<font><b/><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font>' +
+      '</fonts>' +
+      '<fills count="2">' +
+        '<fill><patternFill patternType="none"/></fill>' +
+        '<fill><patternFill patternType="gray125"/></fill>' +
+      '</fills>' +
+      '<borders count="2">' +
+        '<border><left/><right/><top/><bottom/><diagonal/></border>' +
+        '<border>' +
+          '<left style="thin"><color rgb="FF000000"/></left>' +
+          '<right style="thin"><color rgb="FF000000"/></right>' +
+          '<top style="thin"><color rgb="FF000000"/></top>' +
+          '<bottom style="thin"><color rgb="FF000000"/></bottom>' +
+          '<diagonal/>' +
+        '</border>' +
+      '</borders>' +
+      '<cellStyleXfs count="1">' +
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>' +
+      '</cellStyleXfs>' +
+      '<cellXfs count="13">' +
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+        '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
+        '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
+        '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' +
+        '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
+        '<xf numFmtId="164" fontId="3" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>' +
+        '<xf numFmtId="164" fontId="3" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' +
+        '<xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
+        '<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' +
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
+        '<xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
+      '</cellXfs>' +
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+      '<dxfs count="0"/>' +
+      '<tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/>' +
+      '</styleSheet>';
   }
 
   async function generateXlsxUint8Array(payload) {
@@ -277,6 +278,29 @@
       sigBlendMultiply
     } = payload;
 
+    // Shared Strings Table (100% native Excel 2007/2010 format)
+    const sharedStrings = [];
+    const sharedMap = new Map();
+    let totalStringRefs = 0;
+
+    function addSharedString(text) {
+      const s = String(text ?? '');
+      totalStringRefs++;
+      if (sharedMap.has(s)) return sharedMap.get(s);
+      const idx = sharedStrings.length;
+      sharedStrings.push(s);
+      sharedMap.set(s, idx);
+      return idx;
+    }
+
+    function strCell(ref, text, style) {
+      if (text === '' || text === null || text === undefined) {
+        return `<c r="${ref}" s="${style}"/>`;
+      }
+      const idx = addSharedString(text);
+      return `<c r="${ref}" s="${style}" t="s"><v>${idx}</v></c>`;
+    }
+
     const startSerial = isoToExcelSerial(startDate);
     const endSerial = isoToExcelSerial(endDate);
     const totalDaysVal = (startSerial && endSerial && endSerial >= startSerial)
@@ -293,53 +317,58 @@
     ];
 
     const rowsXml = [];
+    const allCols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P'];
 
-    // Row 1: Company Name
-    rowsXml.push(`<row r="1" ht="19.5" customHeight="1">${strCell('A1', companyName, 1)}</row>`);
-    // Row 2: Subtitle
-    rowsXml.push(`<row r="2" ht="16.5" customHeight="1">${strCell('A2', reportTitle, 2)}</row>`);
-    // Row 3: Blank
-    rowsXml.push(`<row r="3" ht="10" customHeight="1"/>`);
+    // Row 1: Company Name (A1:P1 merged)
+    let r1 = strCell('A1', companyName || 'Arkan Group', 1);
+    for (let i = 1; i < allCols.length; i++) r1 += `<c r="${allCols[i]}1" s="0"/>`;
+    rowsXml.push(`<row r="1" spans="1:16" ht="19.5" customHeight="1">${r1}</row>`);
+
+    // Row 2: Subtitle (A2:P2 merged)
+    let r2 = strCell('A2', reportTitle || 'Tour Expenses (Out of Khulna)', 2);
+    for (let i = 1; i < allCols.length; i++) r2 += `<c r="${allCols[i]}2" s="0"/>`;
+    rowsXml.push(`<row r="2" spans="1:16" ht="16.5" customHeight="1">${r2}</row>`);
+
+    // Row 3 intentionally omitted (standard blank row in Excel)
+
     // Row 4: Destination & Duration
-    let r4 = strCell('A4', `Destination: ${destination}`, 3);
+    let r4 = strCell('A4', `Destination: ${destination || ''}`, 3);
     r4 += strCell('E4', 'Duration:', 3);
-    r4 += startSerial ? `<c r="F4" s="5"><v>${startSerial}</v></c>` : strCell('F4', startDate, 3);
+    r4 += startSerial ? `<c r="F4" s="5"><v>${startSerial}</v></c>` : strCell('F4', startDate || '', 3);
     r4 += strCell('G4', 'to', 4);
-    r4 += endSerial ? `<c r="H4" s="6"><v>${endSerial}</v></c>` : strCell('H4', endDate, 3);
-    rowsXml.push(`<row r="4" ht="16" customHeight="1">${r4}</row>`);
+    r4 += endSerial ? `<c r="H4" s="6"><v>${endSerial}</v></c>` : strCell('H4', endDate || '', 3);
+    rowsXml.push(`<row r="4" spans="1:16" ht="16" customHeight="1">${r4}</row>`);
 
     // Row 5: Purpose, Total Day, Travellers Designation
-    let r5 = strCell('A5', `Purpose: ${purpose}`, 3);
+    let r5 = strCell('A5', `Purpose: ${purpose || ''}`, 3);
     r5 += strCell('E5', 'Total Day:', 3);
     r5 += (startSerial && endSerial)
       ? formulaCell('F5', 'H4-F4+1', totalDaysVal, 3)
       : numCell('F5', totalDaysVal, 3, true);
-    r5 += strCell('I5', `Travellers Designation: ${designation}`, 3);
-    rowsXml.push(`<row r="5" ht="16" customHeight="1">${r5}</row>`);
+    r5 += strCell('I5', `Travellers Designation: ${designation || ''}`, 3);
+    rowsXml.push(`<row r="5" spans="1:16" ht="16" customHeight="1">${r5}</row>`);
 
     // Row 6: Table Header Row 1
     let r6 = '';
     r6 += strCell('A6', 'Date', 7);
-    r6 += strCell('B6', 'Destination', 7) + strCell('C6', '', 7);
+    r6 += strCell('B6', 'Destination', 7) + `<c r="C6" s="7"/>`;
     r6 += strCell('D6', 'Transportation Expenses', 7)
-      + strCell('E6', '', 7) + strCell('F6', '', 7)
-      + strCell('G6', '', 7) + strCell('H6', '', 7) + strCell('I6', '', 7);
+      + `<c r="E6" s="7"/><c r="F6" s="7"/><c r="G6" s="7"/><c r="H6" s="7"/><c r="I6" s="7"/>`;
     r6 += strCell('J6', 'Meal Expenses', 7)
-      + strCell('K6', '', 7) + strCell('L6', '', 7)
-      + strCell('M6', '', 7) + strCell('N6', '', 7);
+      + `<c r="K6" s="7"/><c r="L6" s="7"/><c r="M6" s="7"/><c r="N6" s="7"/>`;
     r6 += strCell('O6', 'Living Cost', 7);
     r6 += strCell('P6', 'Grand Total', 7);
-    rowsXml.push(`<row r="6" ht="26" customHeight="1">${r6}</row>`);
+    rowsXml.push(`<row r="6" spans="1:16" ht="26" customHeight="1">${r6}</row>`);
 
     // Row 7: Table Header Row 2
     const h2 = [
       ['A', ''], ['B', 'From'], ['C', 'To'],
-      ['D', 'Bus'], ['E', 'Metro/ Rail '], ['F', 'Auto'], ['G', 'Bike'], ['H', 'Rickshaw'], ['I', 'Transport Total'],
+      ['D', 'Bus'], ['E', 'Metro/ Rail'], ['F', 'Auto'], ['G', 'Bike'], ['H', 'Rickshaw'], ['I', 'Transport Total'],
       ['J', 'Breakfast'], ['K', 'Lunch'], ['L', 'Dinner'], ['M', 'Tea Break'], ['N', 'Meal Total'],
       ['O', 'Hotel'], ['P', 'Total Day Expense']
     ];
-    let r7 = h2.map(([col, txt]) => strCell(`${col}7`, txt, 7)).join('');
-    rowsXml.push(`<row r="7" ht="28" customHeight="1">${r7}</row>`);
+    const r7 = h2.map(([col, txt]) => (txt ? strCell(`${col}7`, txt, 7) : `<c r="${col}7" s="7"/>`)).join('');
+    rowsXml.push(`<row r="7" spans="1:16" ht="28" customHeight="1">${r7}</row>`);
 
     // Data Rows starting at Row 8
     let curRow = 8;
@@ -402,7 +431,7 @@
         rowCells += numCell(`G${r}`, rt.bike, 10, false);
         rowCells += numCell(`H${r}`, rt.rickshaw, 10, false);
 
-        // Cols I..P: First row holds values/formulas, sub-rows empty bordered cells (merged vertically)
+        // Cols I..P: First row holds values/formulas; sub-rows empty bordered cells (merged vertically)
         if (idx === 0) {
           rowCells += formulaCell(`I${r}`, `SUM(D${startR}:H${endR})`, dayTrans, 10);
           rowCells += numCell(`J${r}`, day.breakfast, 10, false);
@@ -418,7 +447,7 @@
           }
         }
 
-        rowsXml.push(`<row r="${r}" ht="15.75" customHeight="1">${rowCells}</row>`);
+        rowsXml.push(`<row r="${r}" spans="1:16" ht="15.75" customHeight="1">${rowCells}</row>`);
       });
 
       if (endR > startR) {
@@ -440,134 +469,145 @@
     for (const col of ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P']) {
       totCells += formulaCell(`${col}${totalRow}`, `SUM(${col}8:${col}${lastDataRow})`, sumCols[col], 11);
     }
-    rowsXml.push(`<row r="${totalRow}" ht="18" customHeight="1">${totCells}</row>`);
+    rowsXml.push(`<row r="${totalRow}" spans="1:16" ht="18" customHeight="1">${totCells}</row>`);
 
-    // 3 Blank spacing rows for signature
-    rowsXml.push(`<row r="${totalRow + 1}" ht="15" customHeight="1"/>`);
-    rowsXml.push(`<row r="${totalRow + 2}" ht="15" customHeight="1"/>`);
-    rowsXml.push(`<row r="${totalRow + 3}" ht="15" customHeight="1"/>`);
+    // Rows totalRow+1 .. totalRow+3 intentionally left empty for signature space (matching native Excel)
 
     // Signature Labels Row (Row totalRow + 4, matching original Row 115)
     const sigRow = totalRow + 4;
     const labels = signatureLabels || ['Prepared by', 'Dept. Head', 'Audit Dept.', 'Accounts', 'GM (Operation)', 'Director'];
     const sigCols = ['B', 'D', 'F', 'H', 'J', 'N'];
-    let sigCells = sigCols.map((col, i) => strCell(`${col}${sigRow}`, labels[i] || '', 12)).join('');
-    rowsXml.push(`<row r="${sigRow}" ht="16" customHeight="1">${sigCells}</row>`);
+    const sigCells = sigCols.map((col, i) => strCell(`${col}${sigRow}`, labels[i] || '', 12)).join('');
+    rowsXml.push(`<row r="${sigRow}" spans="2:14" ht="16" customHeight="1">${sigCells}</row>`);
 
     // Optional embedded signature image
     const sigPng = await renderSignaturePngBytes(signatureDataUrl, showSigDate, sigDate, sigBlendMultiply);
     const hasDrawing = Boolean(sigPng && sigPng.bytes && sigPng.bytes.length > 0);
 
-    const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <cols>
-    <col min="1" max="1" width="11.5" customWidth="1"/>
-    <col min="2" max="3" width="16.5" customWidth="1"/>
-    <col min="4" max="5" width="9" customWidth="1"/>
-    <col min="6" max="6" width="10" customWidth="1"/>
-    <col min="7" max="7" width="8" customWidth="1"/>
-    <col min="8" max="8" width="10.5" customWidth="1"/>
-    <col min="9" max="9" width="11.5" customWidth="1"/>
-    <col min="10" max="14" width="9.5" customWidth="1"/>
-    <col min="15" max="15" width="9" customWidth="1"/>
-    <col min="16" max="16" width="11.5" customWidth="1"/>
-  </cols>
-  <sheetData>
-    ${rowsXml.join('\n    ')}
-  </sheetData>
-  <mergeCells count="${merges.length}">
-    ${merges.map(m => `<mergeCell ref="${m}"/>`).join('\n    ')}
-  </mergeCells>
-  <pageMargins left="0.5" right="0.5" top="0.55" bottom="0.55" header="0.25" footer="0.25"/>
-  <pageSetup paperSize="9" scale="80" orientation="landscape"/>
-  ${hasDrawing ? '<drawing r:id="rId1"/>' : ''}
-</worksheet>`;
+    // Build xl/sharedStrings.xml
+    const ssItems = sharedStrings.map((s) => {
+      const needsSpace = /^\s|\s$/.test(s);
+      return needsSpace
+        ? `<si><t xml:space="preserve">${escXml(s)}</t></si>`
+        : `<si><t>${escXml(s)}</t></si>`;
+    }).join('');
+    const sharedStringsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      `<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${totalStringRefs}" uniqueCount="${sharedStrings.length}">${ssItems}</sst>`;
 
-    const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  ${hasDrawing ? '<Default Extension="png" ContentType="image/png"/>' : ''}
-  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.worksheet+xml"/>
-  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.styles+xml"/>
-  ${hasDrawing ? '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>' : ''}
-</Types>`;
+    const sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      `<dimension ref="A1:P${sigRow}"/>` +
+      '<sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews>' +
+      '<sheetFormatPr defaultRowHeight="15"/>' +
+      '<cols>' +
+        '<col min="1" max="1" width="11.5" customWidth="1"/>' +
+        '<col min="2" max="3" width="16.5" customWidth="1"/>' +
+        '<col min="4" max="5" width="9" customWidth="1"/>' +
+        '<col min="6" max="6" width="10" customWidth="1"/>' +
+        '<col min="7" max="7" width="8" customWidth="1"/>' +
+        '<col min="8" max="8" width="10.5" customWidth="1"/>' +
+        '<col min="9" max="9" width="11.5" customWidth="1"/>' +
+        '<col min="10" max="14" width="9.5" customWidth="1"/>' +
+        '<col min="15" max="15" width="9" customWidth="1"/>' +
+        '<col min="16" max="16" width="11.5" customWidth="1"/>' +
+      '</cols>' +
+      `<sheetData>${rowsXml.join('')}</sheetData>` +
+      `<mergeCells count="${merges.length}">${merges.map(m => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>` +
+      '<pageMargins left="0.5" right="0.5" top="0.55" bottom="0.55" header="0.25" footer="0.25"/>' +
+      '<pageSetup paperSize="9" scale="80" orientation="landscape"/>' +
+      (hasDrawing ? '<drawing r:id="rId1"/>' : '') +
+      '</worksheet>';
 
-    const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
-</Relationships>`;
+    const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      (hasDrawing ? '<Default Extension="png" ContentType="image/png"/>' : '') +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.worksheet+xml"/>' +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.styles+xml"/>' +
+      '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>' +
+      '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>' +
+      '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>' +
+      (hasDrawing ? '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>' : '') +
+      '</Types>';
 
-    const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <sheets>
-    <sheet name="Tour Expenses" sheetId="1" r:id="rId1"/>
-  </sheets>
-</workbook>`;
+    const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>' +
+      '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>' +
+      '</Relationships>';
 
-    const workbookRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-</Relationships>`;
+    const nowIso = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+    const coreXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">' +
+      '<dc:creator>Arkan Group</dc:creator>' +
+      `<dcterms:created xsi:type="dcterms:W3CDTF">${nowIso}</dcterms:created>` +
+      `<dcterms:modified xsi:type="dcterms:W3CDTF">${nowIso}</dcterms:modified>` +
+      '</cp:coreProperties>';
+
+    const appXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">' +
+      '<Application>Microsoft Excel</Application>' +
+      '</Properties>';
+
+    const workbookXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<bookViews><workbookView xWindow="0" yWindow="0" windowWidth="24000" windowHeight="12000"/></bookViews>' +
+      '<sheets><sheet name="Tour Expenses" sheetId="1" r:id="rId1"/></sheets>' +
+      '<calcPr calcId="144525" fullCalcOnLoad="1"/>' +
+      '</workbook>';
+
+    const workbookRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+      '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>' +
+      '</Relationships>';
 
     const zipEntries = [
       { name: '[Content_Types].xml', data: contentTypes },
       { name: '_rels/.rels', data: rootRels },
+      { name: 'docProps/core.xml', data: coreXml },
+      { name: 'docProps/app.xml', data: appXml },
       { name: 'xl/workbook.xml', data: workbookXml },
       { name: 'xl/_rels/workbook.xml.rels', data: workbookRels },
       { name: 'xl/styles.xml', data: buildStylesXml() },
+      { name: 'xl/sharedStrings.xml', data: sharedStringsXml },
       { name: 'xl/worksheets/sheet1.xml', data: sheetXml }
     ];
 
     if (hasDrawing) {
-      // Zero-indexed row anchor right above sigRow (totalRow is 1-based, so 0-based row = totalRow)
       const fromRow0 = totalRow;
       const toRow0 = sigRow - 1;
       const toCol0 = (showSigDate && sigDate) ? 2 : 1;
+      const cxEmu = Math.round((sigPng.width || 240) * 9525 * 0.65);
+      const cyEmu = Math.round((sigPng.height || 74) * 9525 * 0.65);
 
-      const sheetRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>
-</Relationships>`;
+      const sheetRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>' +
+        '</Relationships>';
 
-      const drawingRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/signature.png"/>
-</Relationships>`;
+      const drawingRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/signature.png"/>' +
+        '</Relationships>';
 
-      const drawingXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
-  <xdr:twoCellAnchor editAs="oneCell">
-    <xdr:from>
-      <xdr:col>0</xdr:col>
-      <xdr:colOff>450000</xdr:colOff>
-      <xdr:row>${fromRow0}</xdr:row>
-      <xdr:rowOff>60000</xdr:rowOff>
-    </xdr:from>
-    <xdr:to>
-      <xdr:col>${toCol0}</xdr:col>
-      <xdr:colOff>900000</xdr:colOff>
-      <xdr:row>${toRow0}</xdr:row>
-      <xdr:rowOff>120000</xdr:rowOff>
-    </xdr:to>
-    <xdr:pic>
-      <xdr:nvPicPr>
-        <xdr:cNvPr id="2" name="PreparedBySignature"/>
-        <xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr>
-      </xdr:nvPicPr>
-      <xdr:blipFill>
-        <a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/>
-        <a:stretch><a:fillRect/></a:stretch>
-      </xdr:blipFill>
-      <xdr:spPr>
-        <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
-      </xdr:spPr>
-    </xdr:pic>
-    <xdr:clientData/>
-  </xdr:twoCellAnchor>
-</xdr:wsDr>`;
+      const drawingXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+        '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+        '<xdr:twoCellAnchor editAs="oneCell">' +
+          `<xdr:from><xdr:col>0</xdr:col><xdr:colOff>450000</xdr:colOff><xdr:row>${fromRow0}</xdr:row><xdr:rowOff>60000</xdr:rowOff></xdr:from>` +
+          `<xdr:to><xdr:col>${toCol0}</xdr:col><xdr:colOff>900000</xdr:colOff><xdr:row>${toRow0}</xdr:row><xdr:rowOff>120000</xdr:rowOff></xdr:to>` +
+          '<xdr:pic>' +
+            '<xdr:nvPicPr><xdr:cNvPr id="2" name="Picture 1"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>' +
+            '<xdr:blipFill><a:blip r:embed="rId1" cstate="print"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>' +
+            `<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cxEmu}" cy="${cyEmu}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>` +
+          '</xdr:pic>' +
+          '<xdr:clientData/>' +
+        '</xdr:twoCellAnchor>' +
+        '</xdr:wsDr>';
 
       zipEntries.push(
         { name: 'xl/worksheets/_rels/sheet1.xml.rels', data: sheetRels },
