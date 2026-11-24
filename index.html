@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arkan Group — Tour Expenses Sheet</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2315803d' stroke-width='2'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Cpath d='M3 9h18M9 21V9'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Top Control Bar (Hidden on Print) -->
+  <header class="app-toolbar no-print">
+    <div class="toolbar-inner">
+      <div class="toolbar-left">
+        <div class="brand-badge" title="Tour Expense Sheet Builder">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M3 9h18M9 21V9"/>
+          </svg>
+          <span>Tour Expense</span>
+        </div>
+
+        <div class="month-switcher">
+          <label for="monthSelect" class="sr-only">Saved Month</label>
+          <select id="monthSelect" title="Select saved month sheet"></select>
+          <button type="button" id="btnNewMonth" class="btn btn-primary" title="নতুন মাসের শিট তৈরি করুন">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 5v14M5 12h14"/></svg>
+            <span>New Month</span>
+          </button>
+          <button type="button" id="btnDeleteMonth" class="btn btn-icon btn-danger-ghost" title="এই মাসের শিট মুছুন">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="toolbar-right">
+        <button type="button" id="btnManagePlaces" class="btn btn-ghost" title="From / To ড্রপডাউন লোকেশন লিস্ট ম্যানেজ করুন">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span>Places (<span id="placesCountBadge">0</span>)</span>
+        </button>
+
+        <button type="button" id="btnSignature" class="btn btn-ghost" title="Prepared by সিগনেচার আপলোড বা পরিবর্তন করুন">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+          <span>Signature</span>
+        </button>
+
+        <button type="button" id="btnSortDates" class="btn btn-ghost" title="তারিখ অনুযায়ী সাজান">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5h10M11 9h7M11 13h4M3 17l3 3 3-3M6 18V4"/></svg>
+          <span>Sort</span>
+        </button>
+
+        <div class="toolbar-divider"></div>
+
+        <button type="button" id="btnCloudSync" class="btn btn-cloud" title="Google Sheet-এ অটোমেটিক ক্লাউড ডেটাবেজ সেভ সেটআপ করুন">
+          <span id="cloudStatusDot" class="cloud-dot cloud-dot-disconnected"></span>
+          <span id="cloudBtnText">Google Sheet</span>
+        </button>
+
+        <button type="button" id="btnBackup" class="btn btn-ghost" title="ডাটা ব্যাকআপ ডাউনলোড (JSON)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          <span>Backup</span>
+        </button>
+        <button type="button" id="btnRestore" class="btn btn-ghost" title="ব্যাকআপ ফাইল রিস্টোর করুন (JSON)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          <span>Restore</span>
+        </button>
+        <input type="file" id="restoreFileInput" accept=".json" hidden />
+
+        <div class="toolbar-divider"></div>
+
+        <button type="button" id="btnExportXlsx" class="btn btn-excel" title="হুবহু ফরম্যাটে এক্সেল (.xlsx) ডাউনলোড করুন">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="m9 13 6 6M15 13l-6 6"/></svg>
+          <span>Excel (.xlsx)</span>
+        </button>
+
+        <button type="button" id="btnPrint" class="btn btn-dark" title="প্রিন্ট বা PDF সেভ করুন (A4 Landscape)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          <span>Print / PDF</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Live Summary Ribbon -->
+    <div class="summary-ribbon">
+      <div class="summary-inner">
+        <div class="summary-pills">
+          <span class="stat-pill">Entries: <strong id="statDays">0</strong> days / <strong id="statRoutes">0</strong> routes</span>
+          <span class="stat-pill">Transport: <strong id="statTransport">0</strong></span>
+          <span class="stat-pill">Meal: <strong id="statMeal">0</strong></span>
+          <span class="stat-pill">Hotel: <strong id="statHotel">0</strong></span>
+          <span class="stat-pill stat-pill-grand">Grand Total: <strong id="statGrand">0</strong></span>
+        </div>
+        <div class="summary-right">
+          <label class="lock-dates-toggle" title="চালু থাকলে ড্র্যাগ বা মুভ করার সময় ডেট অপরিবর্তিত থাকবে, শুধু Destination থেকে Grand Total পর্যন্ত সরবে">
+            <input type="checkbox" id="chkLockDatesOnMove" checked />
+            <span>Keep Dates Fixed (তারিখ স্থির)</span>
+          </label>
+          <span id="saveStatus" class="save-status">Saved locally</span>
+          <button type="button" id="btnQuickAddDate" class="btn btn-xs btn-outline">+ Add Date</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Printable Excel-Replica Workspace -->
+  <main class="workspace-canvas">
+    <section id="printableSheet" class="excel-sheet">
+
+      <!-- Rows 1 & 2: Company Name & Report Title -->
+      <div class="sheet-title-block">
+        <div id="companyName" class="sheet-company" contenteditable="true" spellcheck="false" title="কোম্পানির নাম পরিবর্তন করতে ক্লিক করুন">Arkan Group</div>
+        <div id="reportTitle" class="sheet-subtitle" contenteditable="true" spellcheck="false" title="রিপোর্টের শিরোনাম পরিবর্তন করতে ক্লিক করুন">Tour Expenses (Out of Khulna)</div>
+      </div>
+
+      <!-- Rows 4 & 5: Exact Excel Header Metadata Grid -->
+      <div class="sheet-meta-grid">
+        <!-- Row 4 -->
+        <div class="meta-cell meta-left">
+          <span class="meta-label">Destination:</span>
+          <input type="text" id="metaDestination" class="meta-input" value="Working" placeholder="Working" />
+        </div>
+        <div class="meta-cell meta-center">
+          <span class="meta-label">Duration:</span>
+          <div class="date-picker-box" title="শুরুর তারিখ নির্বাচন করুন">
+            <span id="startDateDisplay" class="date-display">1-8-2026</span>
+            <input type="date" id="metaStartDate" class="date-native-overlay" value="2026-08-01" />
+          </div>
+          <span class="meta-to">to</span>
+          <div class="date-picker-box" title="শেষ তারিখ নির্বাচন করুন">
+            <span id="endDateDisplay" class="date-display">31-8-2026</span>
+            <input type="date" id="metaEndDate" class="date-native-overlay" value="2026-08-31" />
+          </div>
+        </div>
+        <div class="meta-cell meta-right"></div>
+
+        <!-- Row 5 -->
+        <div class="meta-cell meta-left">
+          <span class="meta-label">Purpose:</span>
+          <input type="text" id="metaPurpose" class="meta-input" value="Delar Visit &amp; Surcing" placeholder="Delar Visit &amp; Surcing" />
+        </div>
+        <div class="meta-cell meta-center">
+          <span class="meta-label">Total Day:</span>
+          <span id="metaTotalDays" class="meta-total-days">31</span>
+        </div>
+        <div class="meta-cell meta-right">
+          <span class="meta-label">Travellers Designation:</span>
+          <input type="text" id="metaDesignation" class="meta-input meta-input-desig" value="ASM" placeholder="ASM" />
+        </div>
+      </div>
+
+      <!-- Rows 6+: Exact 16-Column Excel Table -->
+      <div class="table-scroll-wrap">
+        <table id="expenseTable" class="excel-table">
+          <colgroup>
+            <col class="col-date" />
+            <col class="col-from" />
+            <col class="col-to" />
+            <col class="col-num" />
+            <col class="col-num-wide" />
+            <col class="col-num" />
+            <col class="col-num" />
+            <col class="col-num-wide" />
+            <col class="col-total" />
+            <col class="col-num-wide" />
+            <col class="col-num" />
+            <col class="col-num" />
+            <col class="col-num-wide" />
+            <col class="col-total" />
+            <col class="col-num" />
+            <col class="col-grand" />
+            <col class="col-actions no-print" />
+          </colgroup>
+          <thead>
+            <tr class="header-row-1">
+              <th rowspan="2" class="th-date">Date</th>
+              <th colspan="2">Destination</th>
+              <th colspan="6">Transportation Expenses</th>
+              <th colspan="5">Meal Expenses</th>
+              <th>Living<br />Cost</th>
+              <th>Grand<br />Total</th>
+              <th rowspan="2" class="no-print th-actions">Day Tools</th>
+            </tr>
+            <tr class="header-row-2">
+              <th>From</th>
+              <th>To</th>
+              <th>Bus</th>
+              <th>Metro/<br />Rail</th>
+              <th>Auto</th>
+              <th>Bike</th>
+              <th>Rickshaw</th>
+              <th>Transport<br />Total</th>
+              <th>Breakfast</th>
+              <th>Lunch</th>
+              <th>Dinner</th>
+              <th>Tea<br />Break</th>
+              <th>Meal<br />Total</th>
+              <th>Hotel</th>
+              <th>Total Day<br />Expense</th>
+            </tr>
+          </thead>
+
+          <tbody id="expenseTbody">
+            <!-- Dynamically rendered day groups -->
+          </tbody>
+
+          <tfoot>
+            <tr class="excel-total-row">
+              <td class="total-word-cell">Total</td>
+              <td class="total-empty-cell"></td>
+              <td class="total-empty-cell"></td>
+              <td id="sumBus" class="num-total">0</td>
+              <td id="sumMetro" class="num-total">0</td>
+              <td id="sumAuto" class="num-total">0</td>
+              <td id="sumBike" class="num-total">0</td>
+              <td id="sumRickshaw" class="num-total">0</td>
+              <td id="sumTransport" class="num-total sum-highlight">0</td>
+              <td id="sumBreakfast" class="num-total">0</td>
+              <td id="sumLunch" class="num-total">0</td>
+              <td id="sumDinner" class="num-total">0</td>
+              <td id="sumTeaBreak" class="num-total">0</td>
+              <td id="sumMeal" class="num-total sum-highlight">0</td>
+              <td id="sumHotel" class="num-total">0</td>
+              <td id="sumGrand" class="num-total sum-grand">0</td>
+              <td class="no-print action-total-cell"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Screen-only Quick Add Row Controls -->
+      <div class="table-bottom-controls no-print">
+        <button type="button" id="btnAddNextDate" class="btn btn-outline btn-sm">
+          + Add Next Working Date
+        </button>
+        <div class="custom-date-adder">
+          <input type="date" id="customAddDateInput" title="নির্দিষ্ট তারিখ বেছে নিন" />
+          <select id="customAddRoutesCount" title="কয়টি রুট দিয়ে যোগ করবেন">
+            <option value="1">1 route</option>
+            <option value="2">2 routes</option>
+            <option value="3">3 routes</option>
+            <option value="4" selected>4 routes</option>
+            <option value="5">5 routes</option>
+            <option value="6">6 routes</option>
+          </select>
+          <button type="button" id="btnAddCustomDate" class="btn btn-outline btn-sm">+ Add Selected Date</button>
+        </div>
+      </div>
+
+      <!-- Bottom Signatures Section (Exact Excel Row 115 Layout) -->
+      <div class="signature-section">
+        <div class="sig-slot sig-slot-prepared" id="preparedSigBox" title="সিগনেচার পরিবর্তন বা আপলোড করতে ক্লিক করুন">
+          <div class="sig-visual-area">
+            <img id="preparedSigImg" class="sig-image" alt="Prepared by Signature" />
+            <span id="preparedSigDate" class="sig-date-text">31-08-2026</span>
+            <button type="button" class="sig-upload-overlay no-print" id="btnInlineSigEdit">
+              Upload / Edit Signature
+            </button>
+          </div>
+          <div class="sig-label" contenteditable="true" spellcheck="false" data-sig-idx="0">Prepared by</div>
+        </div>
+
+        <div class="sig-slot">
+          <div class="sig-visual-area"></div>
+          <div class="sig-label" contenteditable="true" spellcheck="false" data-sig-idx="1">Dept. Head</div>
+        </div>
+
+        <div class="sig-slot">
+          <div class="sig-visual-area"></div>
+          <div class="sig-label" contenteditable="true" spellcheck="false" data-sig-idx="2">Audit Dept.</div>
+        </div>
+
+        <div class="sig-slot">
+          <div class="sig-visual-area"></div>
+          <div class="sig-label" contenteditable="true" spellcheck="false" data-sig-idx="3">Accounts</div>
+        </div>
+
+        <div class="sig-slot">
+          <div class="sig-visual-area"></div>
+          <div class="sig-label" contenteditable="true" spellcheck="false" data-sig-idx="4">GM (Operation)</div>
+        </div>
+
+        <div class="sig-slot">
+          <div class="sig-visual-area"></div>
+          <div class="sig-label" contenteditable="true" spellcheck="false" data-sig-idx="5">Director</div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Shared Floating Searchable Dropdown for From / To -->
+  <div id="placeDropdown" class="place-dropdown no-print" hidden></div>
+
+  <!-- Floating Clipboard Banner when a Day is Copied -->
+  <div id="clipboardBar" class="clipboard-bar no-print" hidden>
+    <div class="clipboard-info">
+      <span class="clipboard-dot"></span>
+      <span id="clipboardText">Copied day</span>
+    </div>
+    <div class="clipboard-actions">
+      <button type="button" id="btnMultiPaste" class="btn btn-xs btn-primary">Paste to Multiple Dates...</button>
+      <button type="button" id="btnClearClipboard" class="btn btn-xs btn-ghost-light">Clear</button>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast no-print" hidden></div>
+
+  <!-- MODAL 1: Create New Month -->
+  <div id="newMonthModal" class="modal-backdrop no-print" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="newMonthTitle">
+      <div class="modal-header">
+        <h2 id="newMonthTitle">Create New Month Sheet (নতুন মাস তৈরি)</h2>
+        <button type="button" class="modal-close" data-close-modal="newMonthModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="nmMonthPicker">Select Month (মাস বাছুন)</label>
+            <input type="month" id="nmMonthPicker" />
+          </div>
+          <div class="form-group">
+            <label for="nmLabel">Sheet Name</label>
+            <input type="text" id="nmLabel" placeholder="September 2026" />
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="nmStartDate">Duration Start</label>
+            <input type="date" id="nmStartDate" />
+          </div>
+          <div class="form-group">
+            <label for="nmEndDate">Duration End</label>
+            <input type="date" id="nmEndDate" />
+          </div>
+        </div>
+
+        <div class="info-strip">
+          <span>Total Duration Days: <strong id="nmTotalDaysPreview">30</strong> days</span>
+          <span>Working Days (excl. Fridays): <strong id="nmWorkDaysPreview">26</strong> days</span>
+        </div>
+
+        <div class="form-group">
+          <label>How should dates be created? (তারিখ তৈরির পদ্ধতি)</label>
+          <div class="radio-cards">
+            <label class="radio-card">
+              <input type="radio" name="nmMode" value="workdays" checked />
+              <div>
+                <strong>Auto Working Days (শুক্রবার বাদ দিয়ে)</strong>
+                <small>সব কর্মদিবস অটোমেটিক তৈরি হবে, শুধু রুট বসাবেন বা কপি-পেস্ট করবেন</small>
+              </div>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="nmMode" value="clone" />
+              <div>
+                <strong>Clone Current Month Routes (আগের মাসের রুটসহ)</strong>
+                <small>বর্তমান মাসের রুট ও হিসাবগুলো নতুন মাসের কর্মদিবসে অটোমেটিক বসে যাবে</small>
+              </div>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="nmMode" value="alldays" />
+              <div>
+                <strong>All Calendar Dates (মাসের ১ থেকে শেষ তারিখ)</strong>
+                <small>শুক্রবারসহ পুরো মাসের প্রতিটি তারিখ তৈরি হবে</small>
+              </div>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="nmMode" value="blank" />
+              <div>
+                <strong>Manual Blank Sheet (সম্পূর্ণ ম্যানুয়াল)</strong>
+                <small>মাত্র ১টি খালি তারিখ দিয়ে শুরু হবে, নিজে তারিখ ও রুট যোগ করবেন</small>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" id="nmDefaultRoutesGroup">
+          <label for="nmDefaultRoutes">Initial Routes per Day (প্রতি দিনে শুরুতে কয়টি রুট রো থাকবে)</label>
+          <select id="nmDefaultRoutes">
+            <option value="1">1 route row per day</option>
+            <option value="2" selected>2 route rows per day</option>
+            <option value="3">3 route rows per day</option>
+            <option value="4">4 route rows per day</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-close-modal="newMonthModal">Cancel</button>
+        <button type="button" id="btnConfirmNewMonth" class="btn btn-primary">Create Month Sheet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: Manage Places (From/To Dropdown List) -->
+  <div id="placesModal" class="modal-backdrop no-print" hidden>
+    <div class="modal-card modal-sm" role="dialog" aria-labelledby="placesModalTitle">
+      <div class="modal-header">
+        <h2 id="placesModalTitle">From / To Dropdown Places</h2>
+        <button type="button" class="modal-close" data-close-modal="placesModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-hint">এই লিস্টের নামগুলো From এবং To ঘরে ক্লিক করলেই অটোমেটিক ড্রপডাউনে দেখাবে। নতুন নাম টাইপ করলে অটোমেটিক এখানে সেভ হয়ে যাবে।</p>
+        <div class="inline-add-bar">
+          <input type="text" id="newPlaceInput" placeholder="নতুন লোকেশনের নাম লিখুন..." />
+          <button type="button" id="btnAddPlace" class="btn btn-primary btn-sm">Add</button>
+        </div>
+        <div id="placesListContainer" class="places-chip-list"></div>
+      </div>
+      <div class="modal-footer modal-footer-between">
+        <button type="button" id="btnResetPlaces" class="btn btn-ghost btn-sm">Reset Default Places</button>
+        <button type="button" class="btn btn-dark btn-sm" data-close-modal="placesModal">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: Signature Manager -->
+  <div id="signatureModal" class="modal-backdrop no-print" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="sigModalTitle">
+      <div class="modal-header">
+        <h2 id="sigModalTitle">Prepared by Signature (সিগনেচার সেটিংস)</h2>
+        <button type="button" class="modal-close" data-close-modal="signatureModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="sig-tabs">
+          <button type="button" class="sig-tab active" data-sig-tab="upload">Upload Image</button>
+          <button type="button" class="sig-tab" data-sig-tab="draw">Draw Signature</button>
+        </div>
+
+        <div id="sigTabUpload" class="sig-tab-panel">
+          <div class="sig-preview-box">
+            <img id="sigModalPreview" alt="Signature Preview" />
+            <span id="sigModalEmpty" class="sig-empty-msg" hidden>No signature uploaded</span>
+          </div>
+          <div class="sig-upload-actions">
+            <label class="btn btn-primary btn-sm file-btn">
+              Choose Signature Image (PNG/JPG)
+              <input type="file" id="sigFileInput" accept="image/*" hidden />
+            </label>
+            <button type="button" id="btnSigRestoreDefault" class="btn btn-ghost btn-sm">Default Excel Sig</button>
+            <button type="button" id="btnSigRemove" class="btn btn-danger-ghost btn-sm">Remove</button>
+          </div>
+        </div>
+
+        <div id="sigTabDraw" class="sig-tab-panel" hidden>
+          <div class="sig-canvas-wrap">
+            <canvas id="sigCanvas" width="460" height="140"></canvas>
+          </div>
+          <div class="sig-draw-controls">
+            <div class="ink-choices">
+              <span>Ink:</span>
+              <button type="button" class="ink-dot active" data-ink="#111111" style="background:#111111" title="Black"></button>
+              <button type="button" class="ink-dot" data-ink="#1d4ed8" style="background:#1d4ed8" title="Blue"></button>
+            </div>
+            <div>
+              <button type="button" id="btnClearCanvas" class="btn btn-ghost btn-sm">Clear</button>
+              <button type="button" id="btnUseDrawnSig" class="btn btn-primary btn-sm">Apply Drawing</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sig-settings-grid">
+          <div class="form-group">
+            <label for="sigWidthRange">Signature Size: <strong id="sigWidthVal">118px</strong></label>
+            <input type="range" id="sigWidthRange" min="60" max="190" value="118" />
+          </div>
+          <div class="form-group">
+            <label class="checkbox-inline">
+              <input type="checkbox" id="sigBlendMultiply" checked />
+              <span>Remove white paper background (blend)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="sig-date-settings">
+          <label class="checkbox-inline">
+            <input type="checkbox" id="sigShowDateCheck" checked />
+            <span>Show date beside signature</span>
+          </label>
+          <div class="sig-date-input-row">
+            <input type="text" id="sigDateInput" placeholder="31-08-2026" />
+            <button type="button" id="btnSyncSigDate" class="btn btn-ghost btn-xs">Use Month End Date</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-dark" data-close-modal="signatureModal">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: Paste to Multiple Dates -->
+  <div id="multiPasteModal" class="modal-backdrop no-print" hidden>
+    <div class="modal-card modal-sm" role="dialog" aria-labelledby="multiPasteTitle">
+      <div class="modal-header">
+        <h2 id="multiPasteTitle">Paste to Multiple Dates</h2>
+        <button type="button" class="modal-close" data-close-modal="multiPasteModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="multiPasteSummary" class="modal-hint"></p>
+        <div class="multi-paste-toolbar">
+          <button type="button" id="btnSelectEmptyDates" class="btn btn-xs btn-outline">Select Empty Days</button>
+          <button type="button" id="btnSelectNoneDates" class="btn btn-xs btn-ghost">Unselect All</button>
+        </div>
+        <div id="multiPasteList" class="multi-paste-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-close-modal="multiPasteModal">Cancel</button>
+        <button type="button" id="btnConfirmMultiPaste" class="btn btn-primary">Paste to Selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: Google Sheets Free Auto-Save Database -->
+  <div id="cloudModal" class="modal-backdrop no-print" hidden>
+    <div class="modal-card modal-lg" role="dialog" aria-labelledby="cloudModalTitle">
+      <div class="modal-header">
+        <h2 id="cloudModalTitle">Google Sheets Cloud Database (ফ্রি অটো-সেভ)</h2>
+        <button type="button" class="modal-close" data-close-modal="cloudModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="cloudModalStatus" class="cloud-status-banner cloud-banner-disconnected">
+          Not connected — নিচের ৪টি ধাপ অনুসরণ করে আপনার Google Sheet কানেক্ট করুন।
+        </div>
+
+        <div class="cloud-steps-box">
+          <div class="cloud-steps-header">
+            <strong>১ মিনিটে ফ্রি Google Sheet সেটআপ:</strong>
+            <button type="button" id="btnCopyAppsScript" class="btn btn-primary btn-xs">Copy Apps Script Code</button>
+          </div>
+          <ol class="cloud-steps-list">
+            <li>নতুন একটি Google Sheet খুলুন (<a href="https://sheets.new" target="_blank" rel="noopener">sheets.new</a>) এবং নাম দিন (যেমন: <em>Arkan Tour Expenses DB</em>)।</li>
+            <li>উপরের মেনু থেকে <strong>Extensions → Apps Script</strong> ওপেন করুন।</li>
+            <li>আগের কোড মুছে উপরের <strong>Copy Apps Script Code</strong> বাটনে ক্লিক করে সম্পূর্ণ কোডটি পেস্ট করুন এবং <strong>Save (Ctrl+S)</strong> করুন।</li>
+            <li>ডানপাশে <strong>Deploy → New deployment → Web app</strong> বাছুন, <strong>Execute as: Me</strong> এবং <strong>Who has access: Anyone</strong> দিয়ে <strong>Deploy</strong> করুন।</li>
+            <li>পাওয়া <strong>Web app URL</strong> (শেষে <code>/exec</code> থাকে) নিচে পেস্ট করে <strong>Test &amp; Connect</strong> চাপুন!</li>
+          </ol>
+          <details class="cloud-code-details">
+            <summary>Apps Script কোড দেখুন (অথবা <code>google-apps-script.gs</code> ফাইল থেকে কপি করুন)</summary>
+            <pre id="cloudScriptCodeBox" class="cloud-code-pre"></pre>
+          </details>
+        </div>
+
+        <div class="form-group">
+          <label for="cloudUrlInput">Google Apps Script Web App URL (<code>.../exec</code>)</label>
+          <input type="text" id="cloudUrlInput" placeholder="https://script.google.com/macros/s/AKfycb.../exec" />
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="cloudPinInput">Secret PIN (পাবলিক GitHub-এর জন্য অবশ্যই Apps Script-এ SYNC_KEY সেট করুন)</label>
+            <div class="pin-input-wrap">
+              <input type="password" id="cloudPinInput" placeholder="আপনার গোপন PIN লিখুন" autocomplete="off" />
+              <button type="button" id="btnTogglePinVis" class="btn btn-ghost btn-xs" title="PIN দেখুন/লুকান">Show</button>
+            </div>
+          </div>
+          <div class="cloud-toggles-col">
+            <label class="checkbox-inline">
+              <input type="checkbox" id="cloudAutoSaveCheck" checked />
+              <span>প্রতিটি পরিবর্তনে অটো-সেভ (Auto-Save)</span>
+            </label>
+            <label class="checkbox-inline">
+              <input type="checkbox" id="cloudAutoLoadCheck" checked />
+              <span>ওপেন করলেই সর্বশেষ ডেটা অটো-লোড</span>
+            </label>
+            <label class="checkbox-inline">
+              <input type="checkbox" id="cloudReadableCheck" checked />
+              <span>প্রতিটি মাসের আলাদা ফরম্যাটেড শিট ট্যাব তৈরি</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer modal-footer-between">
+        <div class="cloud-footer-actions">
+          <button type="button" id="btnCloudDisconnect" class="btn btn-danger-ghost btn-sm" hidden>Disconnect</button>
+          <button type="button" id="btnCloudClearDevice" class="btn btn-danger-ghost btn-sm" title="শেয়ার্ড কম্পিউটারে কাজ শেষে ব্রাউজার থেকে ডেটা ও লিংক মুছুন">Clear This Device</button>
+        </div>
+        <div class="cloud-footer-actions">
+          <button type="button" id="btnCloudLoadNow" class="btn btn-ghost btn-sm" disabled>Load from Sheet</button>
+          <button type="button" id="btnCloudSaveNow" class="btn btn-excel btn-sm" disabled>Save All to Sheet</button>
+          <button type="button" id="btnCloudTestConnect" class="btn btn-primary btn-sm">Test &amp; Connect</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="data-defaults.js"></script>
+  <script src="xlsx-export.js"></script>
+  <script src="cloud-sync.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
